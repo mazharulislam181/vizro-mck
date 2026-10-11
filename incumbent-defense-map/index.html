@@ -1,0 +1,615 @@
+<title>Incumbent Defense Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: war-room board. KPI strip, scenario bar, then a 4-lane map (Exposure > Attack vectors > Controls > Owners) with a briefing rail. */
+:root {
+  --bg: #eceff3;
+  --surface: #ffffff;
+  --surface-2: #f5f7f9;
+  --ink: #142033;
+  --muted: #5a6677;
+  --line: #ccd3dc;
+  --accent: #0d7a6b;      /* defense / verified */
+  --accent-soft: #d8efe9;
+  --threat: #b4233c;      /* open gap / attack */
+  --threat-soft: #f8e1e5;
+  --money: #9a6510;       /* financial exposure */
+  --money-soft: #f6ead3;
+  --edge: #9aa6b5;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1219; --surface: #131c27; --surface-2: #18232f; --ink: #e5eaf1; --muted: #8e9aab; --line: #2a3747;
+    --accent: #3fc3ad; --accent-soft: #123a35; --threat: #ff6f83; --threat-soft: #3d1a22;
+    --money: #e2ab4c; --money-soft: #3a2c12; --edge: #4c5b6d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1219; --surface: #131c27; --surface-2: #18232f; --ink: #e5eaf1; --muted: #8e9aab; --line: #2a3747;
+  --accent: #3fc3ad; --accent-soft: #123a35; --threat: #ff6f83; --threat-soft: #3d1a22;
+  --money: #e2ab4c; --money-soft: #3a2c12; --edge: #4c5b6d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.45; padding: 0 16px; }
+.wrap { max-width: 1500px; margin: 0 auto; padding-block: 24px 40px; display: flex; flex-direction: column; gap: 18px; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+/* Header */
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+header.top h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 4vw, 44px); line-height: 1; margin: 4px 0 6px; letter-spacing: .01em; text-wrap: balance; }
+header.top p { margin: 0; color: var(--muted); max-width: 68ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 0; border-top: 2px solid var(--edge); display: inline-block; }
+.sw.ok { border-color: var(--accent); }
+.sw.open { border-color: var(--threat); border-top-style: dashed; }
+.sw.money { border-color: var(--money); }
+
+/* KPI strip */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.kpi { padding: 14px 18px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpi + .kpi { border-left: 1px solid var(--line); }
+.kpi .val { font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1; }
+.kpi .sub { font-size: 12px; color: var(--muted); }
+.kpi.threat .val { color: var(--threat); }
+.kpi.ok .val { color: var(--accent); }
+.bar { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+.bar.t i { background: var(--threat); }
+@media (max-width: 760px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi:nth-child(3) { border-left: 0; }
+  .kpi:nth-child(n+3) { border-top: 1px solid var(--line); }
+}
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { border: 1px solid var(--line); background: var(--surface); padding: 6px 12px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.ctrls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; font-size: 13px; }
+.ctrls label { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.ctrls input[type=range] { width: 140px; accent-color: var(--accent); }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--muted); }
+
+/* Board */
+.board { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+@media (max-width: 1180px) { .board { grid-template-columns: minmax(0, 1fr); } }
+.mapbox { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; }
+.scrollhint { display: none; font-size: 12px; color: var(--muted); padding: 10px 16px 0; }
+@media (max-width: 1100px) { .scrollhint { display: block; } }
+.map { position: relative; display: grid; grid-template-columns: 190px 250px 240px 180px; column-gap: 64px; padding: 18px 20px 22px; min-width: 1040px; justify-content: space-between; }
+.map svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.col { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 8px; }
+.colhead { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.colhead b { font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: .02em; }
+.colhead span { font-size: 11.5px; color: var(--muted); }
+.spread { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
+.lanehead { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 6px 0 0; }
+
+.node { text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 7px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; transition: opacity .2s, border-color .2s, box-shadow .2s; }
+.node:hover { border-color: var(--muted); }
+.node .nt { font-weight: 600; font-size: 13px; line-height: 1.25; }
+.node .nm { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.node.sel { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.dimmed .node:not(.hl) { opacity: .28; }
+
+.node.vec { border-left: 3px solid var(--threat); }
+.node.vec.guarded { border-left-color: var(--accent); }
+.node.ctl .nt { font-weight: 500; font-size: 12.5px; }
+.node.ctl.open { background: var(--threat-soft); border-color: color-mix(in srgb, var(--threat) 45%, var(--line)); }
+.node.fin .amt { font-family: var(--mono); font-size: 12px; color: var(--money); }
+.node.own .nt { font-family: var(--display); font-size: 17px; font-weight: 600; }
+
+.pill { font-family: var(--mono); font-size: 10.5px; padding: 1px 6px; border-radius: 3px; white-space: nowrap; letter-spacing: .02em; }
+.pill.ok { background: var(--accent-soft); color: var(--accent); }
+.pill.open { background: var(--threat-soft); color: var(--threat); }
+.pill.money { background: var(--money-soft); color: var(--money); }
+.pill.crit { background: var(--threat); color: var(--surface); }
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: var(--accent); margin-right: 5px; }
+.open .dot, .dot.open { background: var(--threat); }
+
+.edge { fill: none; stroke: var(--edge); stroke-width: 1.1; opacity: .55; transition: opacity .2s; }
+.edge.fv { stroke: var(--money); opacity: .45; }
+.edge.vc.ok { stroke: var(--accent); }
+.edge.vc.open { stroke: var(--threat); stroke-dasharray: 4 3; opacity: .7; }
+.dimmed .edge:not(.hl) { opacity: .07; }
+.edge.hl { opacity: 1; stroke-width: 1.8; }
+
+/* Briefing rail */
+aside.brief { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; min-width: 0; }
+@media (max-width: 1180px) { aside.brief { position: static; max-height: none; } }
+.brief h2 { font-family: var(--display); font-size: 26px; font-weight: 700; line-height: 1.05; margin: 2px 0 0; text-wrap: balance; }
+.brief h3 { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; font-weight: 500; }
+.brief p { margin: 0; }
+.brief .lede { color: var(--muted); }
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.verdict { padding: 10px 12px; border-radius: 4px; font-size: 13px; }
+.verdict.open { background: var(--threat-soft); color: var(--threat); }
+.verdict.ok { background: var(--accent-soft); color: var(--accent); }
+.verdict b { display: block; font-family: var(--display); font-size: 18px; letter-spacing: .02em; }
+ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+ul.list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; }
+.link { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.link:hover { text-decoration-color: var(--ink); }
+.tog { border: 1px solid var(--line); background: var(--surface-2); border-radius: 3px; font-family: var(--mono); font-size: 11px; padding: 2px 7px; cursor: pointer; white-space: nowrap; }
+.tog.open { color: var(--threat); border-color: color-mix(in srgb, var(--threat) 40%, var(--line)); }
+.tog.ok { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.tl { display: grid; grid-template-columns: 40px minmax(0, 1fr) 44px; gap: 8px; align-items: baseline; font-size: 12.5px; padding: 5px 0; border-top: 1px dashed var(--line); }
+.tl .m { font-family: var(--mono); color: var(--muted); }
+.tl .v { font-family: var(--mono); text-align: right; }
+.tl.hit { color: var(--threat); font-weight: 600; }
+.bigbtn { border: 1px solid var(--ink); background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.bigbtn.ghost { background: transparent; color: var(--ink); }
+.note { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">BSS migration · Incumbent defense &amp; quality gate center</div>
+      <h1>Incumbent Defense Map</h1>
+      <p>Every resistance play the incumbent can run, the control that stops it, who signs for that control, and the money that bleeds while the control stays open. Click any node to trace its chain. Toggle a control to see exposure move.</p>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span><i class="sw money"></i>Drives cost</span>
+      <span><i class="sw ok"></i>Control verified</span>
+      <span><i class="sw open"></i>Control open</span>
+      <span><i class="sw"></i>Owner (R / A)</span>
+    </div>
+  </header>
+
+  <section class="kpis" aria-label="Defense posture">
+    <div class="kpi threat"><span class="eyebrow">Unguarded exposure</span><span class="val num" id="k-exp">$0</span><span class="sub" id="k-exp-sub"></span><div class="bar t"><i id="k-exp-bar"></i></div></div>
+    <div class="kpi ok"><span class="eyebrow">Controls verified</span><span class="val num" id="k-cov">0/0</span><span class="sub" id="k-cov-sub"></span><div class="bar"><i id="k-cov-bar"></i></div></div>
+    <div class="kpi"><span class="eyebrow">Open attack vectors</span><span class="val num" id="k-vec">0</span><span class="sub" id="k-vec-sub"></span></div>
+    <div class="kpi"><span class="eyebrow">Largest open bleed</span><span class="val num" id="k-top" style="color:var(--money)">$0</span><span class="sub" id="k-top-sub"></span></div>
+  </section>
+
+  <div class="toolbar">
+    <div class="chips" role="group" aria-label="Derailment scenario">
+      <span class="eyebrow" style="margin-right:4px">Stress-test against</span>
+      <button class="chip" data-scn="all" id="scn-all">Full map</button>
+      <button class="chip" data-scn="ponr_abort" id="scn-ponr">T-3 PONR abort</button>
+      <button class="chip" data-scn="infinite_dual_run" id="scn-dual">Infinite dual-run</button>
+      <button class="chip" data-scn="bespoke_bloat" id="scn-bloat">Bespoke model bloat</button>
+    </div>
+    <div class="ctrls">
+      <label for="horizon">Delay horizon <input type="range" id="horizon" min="3" max="24" step="1" value="12"> <b class="num" id="horizon-v" style="color:var(--ink)">12 mo</b></label>
+      <button class="btn" id="close-all">Close all gaps</button>
+      <button class="btn" id="reset">Reset to baseline</button>
+    </div>
+  </div>
+
+  <div class="board">
+    <div class="mapbox">
+      <div class="scrollhint">Scroll sideways to see all four lanes.</div>
+      <div class="map" id="map">
+        <svg class="edges" id="edges" aria-hidden="true"></svg>
+        <div class="col">
+          <div class="colhead"><b>Exposure</b><span>Monthly cost line the play inflates</span></div>
+          <div class="spread" id="col-fin"></div>
+        </div>
+        <div class="col">
+          <div class="colhead"><b>Attack vectors</b><span>Incumbent resistance plays</span></div>
+          <div id="col-vec" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+        <div class="col">
+          <div class="colhead"><b>Defensive controls</b><span>Quality gates and runbook gates</span></div>
+          <div id="col-ctl" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+        <div class="col">
+          <div class="colhead"><b>Owners</b><span>Responsible / Accountable</span></div>
+          <div class="spread" id="col-own"></div>
+        </div>
+      </div>
+    </div>
+    <aside class="brief" id="brief" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- Data (from the Gemini app's defenseData.ts / derailmentData.ts) ----------
+  var FIN = [
+    { id: 'f1', label: 'Legacy vendor O&M extension', cat: 'Vendor', monthly: 250000, lever: 'Negotiate fixed-term SLA penalty offsets for vendor-induced delay friction.' },
+    { id: 'f5', label: 'Delayed 5G catalog time-to-market', cat: 'Commercial', monthly: 450000, lever: 'Isolate the TMF620 catalog in the target cloud to launch digital offers decoupled from legacy BSS.' },
+    { id: 'f2', label: 'Extended hypercare staffing', cat: 'Staffing', monthly: 180000, lever: 'Deploy self-healing ACL filters to cut care escalation load by 60%.' },
+    { id: 'f3', label: 'Parallel cloud compute', cat: 'Infrastructure', monthly: 120000, lever: 'Right-size dual-run clusters with auto-scaling pods and read-replica offloading.' },
+    { id: 'f4', label: 'Reconciliation overhead', cat: 'Operations', monthly: 65000, lever: 'Move from batch table diffing to real-time event hash reconcilers.' },
+    { id: 'f7', label: 'Regulatory billing penalties', cat: 'Regulatory', monthly: 150000, lever: 'Immutable shadow billing validation with a real-time audit ledger before statements go out.' },
+    { id: 'f6', label: 'Friction-driven churn', cat: 'Churn', monthly: 310000, lever: 'Proactive drift notification and instant self-care correction workflows.' }
+  ];
+
+  var OWNERS = [
+    { id: 'arch', label: 'ARB', full: 'Architecture Review Board', desc: 'Guarantees TM Forum ODA conformance, validates schemas and enforces anti-corruption controls.' },
+    { id: 'dir', label: 'Director', full: 'Technology Director / Steering Committee', desc: 'Holds executive accountability and sign-off authority for Point of No Return milestones.' },
+    { id: 'pmo', label: 'PMO', full: 'Project Management Office', desc: 'Tracks delivery schedule, dependency coordination and cutover bridge execution.' },
+    { id: 'ops', label: 'Cloud Ops', full: 'Cloud Platform & SRE Operations', desc: 'Runs Kubernetes workloads, event streaming, canary routing and rollback execution.' },
+    { id: 'legacy', label: 'Incumbent', full: 'Incumbent vendor & legacy maintainers', desc: 'Responsible for legacy exports, snapshot extraction and endpoint stabilization.' }
+  ];
+
+  var VECTORS = [
+    { id: 'v1', lane: 'phase', tag: 'P1', where: 'Design & ODA mapping', name: "The 'Custom Exception' trap", sev: 'high',
+      play: 'Demand more than 150 custom data field extensions, claiming standard TM Forum APIs cause data leakage.',
+      goal: 'Force custom dependencies into the clean model to bloat translation code.', kpi: '>150 custom extensions forced into contract',
+      counter: 'Strict ARB validation. Mandate 1-to-1 baseline mappings against pure TM Forum SID. Reject all downstream legacy fields.',
+      std: 'TM Forum ODA Component Model & SID (GB922)', api: 'TMF620 Product Catalog / TMF622 Product Ordering',
+      fin: ['f1', 'f5'], ctl: ['c-sid', 'c-schema', 'c-ctk', 'c-acl'] },
+    { id: 'v2', lane: 'phase', tag: 'P2', where: 'Configuration & API integration', name: "The 'HTTP 200 OK' sabotage", sev: 'high',
+      play: 'Wrap application crashes, database lockouts and timeouts inside successful network codes.',
+      goal: 'Hide structural database faults from automated tracking pipelines.', kpi: '100% of internal errors hidden in 200 OK',
+      counter: 'Consumer-driven contract tests (Pact). Gateway drops and alerts on 200 payloads carrying exception strings.',
+      std: 'RFC 7807 Problem Details & TMF Open API guidelines', api: 'TMF666 Account Mgmt / TMF632 Party Mgmt',
+      fin: ['f2', 'f5'], ctl: ['c-pact', 'c-gw', 'c-http'] },
+    { id: 'v3', lane: 'phase', tag: 'P3', where: 'Dual-write & parallel running', name: 'Timestamp disruption & direct DB bypass', sev: 'critical',
+      play: 'Run maintenance scripts directly on the old database node, bypassing the live streaming bus.',
+      goal: 'Produce continuous data validation gaps so parity can never be certified.', kpi: '>10,000 daily out-of-sync profiles',
+      counter: 'Route all legacy writes through an audited event pipeline. Reconcile in real time on read-only isolated replicas.',
+      std: 'Event-driven architecture / Debezium CDC', api: 'Kafka event bus / Outbox publisher',
+      fin: ['f3', 'f4', 'f7'], ctl: ['c-cdc', 'c-replica', 'c-recon'] },
+    { id: 'v4', lane: 'phase', tag: 'P4', where: 'Cohort micro-cutovers', name: 'T-Minus freeze extension', sev: 'critical',
+      play: 'Delay the final database backup handoff, citing emergency infrastructure verification.',
+      goal: 'Run out the clock on the maintenance window to trigger a panic cancellation.', kpi: 'Handoff delay beyond 120 minutes',
+      counter: 'Automated gates along the T-Minus checklist. Hard stop and safe rollback at the T-3h PONR line.',
+      std: 'Blue/green cutover protocol & PONR gate', api: 'TMF641 Service Order Orchestration',
+      fin: ['f1', 'f5'], ctl: ['c-tminus', 'c-ponr', 'c-cohort'] },
+    { id: 'v5', lane: 'phase', tag: 'P5', where: 'Hypercare stabilization', name: 'Tribal knowledge leaks', sev: 'medium',
+      play: 'Withhold undocumented cleansing procedures for legacy billing variations.',
+      goal: 'Leak bad profiles into the new CRM to provoke fallback demands.', kpi: 'Care escalations up more than 25%',
+      counter: 'Validation filters on the ACL. Auto-quarantine anomalous records before they reach customer frontends.',
+      std: 'DDD Anti-Corruption Layer', api: 'TMF679 Customer Bill Mgmt / Quarantine DLQ',
+      fin: ['f2', 'f6', 'f7'], ctl: ['c-acl', 'c-dlq', 'c-anomaly', 'c-care'] },
+    { id: 'r1', lane: 'cut', tag: 'T-48h', where: 'Initiate staging snapshot copies', name: 'Cold export slowdown', sev: 'high',
+      play: 'Limit outbound bandwidth on the legacy arrays.', role: 'Cloud Ops & Infrastructure Lead',
+      counter: 'Spin up a dedicated snapshot read-replica with a direct SAN export bus.',
+      check: 'Export bandwidth above 850 MB/s; checksum validation within 90 minutes.',
+      fin: ['f3', 'f1'], ctl: ['c-san'] },
+    { id: 'r2', lane: 'cut', tag: 'T-12h', where: 'Final delta sync checks', name: 'Schema shift injection', sev: 'high',
+      play: 'Alter minor field lengths inside secondary lookups.', role: 'Lead Integration Architect',
+      counter: 'Auto-revert the table alteration and enforce a strict contract schema lock.',
+      check: 'Schema hash matches ARB baseline v3.2 with 100% attribute parity.',
+      fin: ['f1'], ctl: ['c-lock', 'c-schema'] },
+    { id: 'r3', lane: 'cut', tag: 'T-4h', where: 'Freeze CRM write pipelines', name: 'The un-indexed query scan', sev: 'high',
+      play: 'Run heavy internal analytical reports to inflate compute load.', role: 'Cloud Ops / DBA on-call',
+      counter: 'Kill non-essential reporting sessions and throttle legacy analytics pools.',
+      check: 'Database CPU below 25%; write pipeline zero-queue confirmed.',
+      fin: ['f3'], ctl: ['c-rate'] },
+    { id: 'r4', lane: 'cut', tag: 'T-3h', where: 'Point of No Return gate review', name: 'Sign-off withholding', sev: 'critical', ponr: true,
+      play: 'Delay backup verification approvals by citing structural data concerns.', role: 'Director & Steering Committee',
+      counter: 'If any pre-condition fails at T-03:00:00, execute an immediate safe automated rollback.',
+      check: 'All 8 pre-flight invariants green; Director digital signature committed.',
+      fin: ['f1', 'f5'], ctl: ['c-penalty', 'c-ponr'] },
+    { id: 'r5', lane: 'cut', tag: 'T-1h', where: 'Transition edge routing', name: 'Routing path misdirection', sev: 'high',
+      play: 'Drop network configuration packets during test runs.', role: 'Network Engineering & Cloud Ops',
+      counter: 'Flip BGP/DNS routes back to the legacy edge via an automated health-check probe.',
+      check: '5% canary traffic with 0% dropped packets and under 45 ms latency.',
+      fin: ['f6'], ctl: ['c-canary'] },
+    { id: 'r6', lane: 'cut', tag: 'T+0', where: 'Go-live of core services', name: 'Corrupted blob leak', sev: 'high',
+      play: 'Release dirty historical customer records into downstream sync loops.', role: 'Solution Architect & Lead Dev',
+      counter: 'Auto-quarantine corrupted customer IDs into dead-letter review without failing the stream.',
+      check: 'Billing core accepting live transactions; ACL quarantine rate under 0.05%.',
+      fin: ['f6', 'f7'], ctl: ['c-dlq', 'c-acl'] }
+  ];
+
+  var CONTROLS = [
+    { id: 'c-sid', name: '1-to-1 SID mapping audit', src: 'P1 quality check', ok: true, own: [['arch', 'R'], ['dir', 'A']], desc: 'ARB sign-off verifying zero custom extensions without formal variance approval.' },
+    { id: 'c-schema', name: 'Canonical schema gate', src: 'P1 quality check', ok: true, own: [['arch', 'R'], ['dir', 'A']], desc: 'JSON Schema validator rejects any payload carrying legacy column names.' },
+    { id: 'c-ctk', name: 'TMF Open API CTK conformance', src: 'P1 quality check', ok: false, own: [['arch', 'R'], ['dir', 'A']], desc: 'Automated TM Forum Conformance Test Kit execution report for every vendor spec.' },
+    { id: 'c-acl', name: 'Anti-Corruption Layer compiler', src: 'Architecture boundary', ok: true, own: [['arch', 'R'], ['dir', 'A']], desc: 'Translates legacy schemas into canonical SID entities and blocks non-standard attributes at the domain boundary.' },
+    { id: 'c-pact', name: 'Pact contract tests (CDCT)', src: 'P2 quality check', ok: true, own: [['arch', 'R'], ['dir', 'A']], desc: 'Pact verification in CI/CD blocks opaque payloads before they merge.' },
+    { id: 'c-gw', name: 'Gateway exception filter', src: 'P2 quality check', ok: true, own: [['arch', 'R'], ['dir', 'A']], desc: 'Envoy/Kong inspection reclassifies 200 OK bodies carrying stack traces or DB lock markers as 502/503.' },
+    { id: 'c-http', name: 'Semantic HTTP status enforcement', src: 'P2 quality check', ok: false, own: [['arch', 'R'], ['legacy', 'R'], ['dir', 'A']], desc: 'Strict 4xx/5xx per TM Forum REST specs. Legacy endpoint wrappers must be remediated by the incumbent.' },
+    { id: 'c-cdc', name: 'Audited CDC event bus', src: 'P3 quality check', ok: true, own: [['arch', 'R'], ['dir', 'A']], desc: 'Debezium connector captures every database transaction log unconditionally.' },
+    { id: 'c-replica', name: 'Read-only replica isolation', src: 'P3 quality check', ok: false, own: [['ops', 'R'], ['dir', 'A']], desc: 'Revoke direct write permissions for batch maintenance jobs on primary nodes.' },
+    { id: 'c-recon', name: 'Continuous reconciler daemon', src: 'P3 quality check', ok: false, own: [['arch', 'R'], ['dir', 'A']], desc: 'Hashing engine matches balance records every 60 seconds; flags timestamp deltas over 500 ms.' },
+    { id: 'c-tminus', name: 'T-Minus gate automation', src: 'P4 quality check', ok: true, own: [['pmo', 'R'], ['ops', 'R'], ['legacy', 'R'], ['dir', 'A']], desc: 'Snapshot checks run automatically without waiting for vendor email confirmation.' },
+    { id: 'c-ponr', name: 'T-3h PONR hard cutoff', src: 'P4 quality check', ok: true, own: [['arch', 'R'], ['ops', 'R'], ['dir', 'A']], desc: 'Extending the window needs executive sponsor approval; automatic fallback is scripted.' },
+    { id: 'c-cohort', name: 'Micro-cohort sizing (2.5%)', src: 'P4 quality check', ok: true, own: [['legacy', 'R'], ['ops', 'A']], desc: 'Pilot cutover limited to 2.5% of the subscriber base to cap blast radius.' },
+    { id: 'c-dlq', name: 'DLQ auto-quarantine', src: 'P5 quality check', ok: true, own: [['arch', 'R'], ['dir', 'A']], desc: 'Malformed legacy billing records diverted to a dead-letter queue before they touch the CRM UI.' },
+    { id: 'c-anomaly', name: 'Tariff anomaly detector', src: 'P5 quality check', ok: true, own: [['ops', 'R'], ['dir', 'A']], desc: 'Real-time telemetry on tariff mapping anomalies and code mismatch frequency.' },
+    { id: 'c-care', name: 'Care shadow verification', src: 'P5 quality check', ok: false, own: [['pmo', 'R'], ['ops', 'R'], ['dir', 'A']], desc: 'Hypercare routing equipped with a legacy field translation lookup table.' },
+    { id: 'c-san', name: 'Thread-pool monitors & SAN replica', src: 'T-48h runbook gate', ok: true, own: [['ops', 'R'], ['legacy', 'R'], ['ops', 'A']], desc: 'Real-time infrastructure thread-pool monitors and pipeline load caps.' },
+    { id: 'c-lock', name: 'Schema hash lock', src: 'T-12h runbook gate', ok: true, own: [['arch', 'R'], ['dir', 'A']], desc: 'Automated schema mapping verification before code compilation.' },
+    { id: 'c-rate', name: 'Gateway rate-limit & session pooling', src: 'T-4h runbook gate', ok: true, own: [['ops', 'R'], ['dir', 'A']], desc: 'Perimeter rate-limiting and session pooling active at the gateway tier.' },
+    { id: 'c-penalty', name: 'Auto-triggered milestone penalties', src: 'T-3h runbook gate', ok: false, own: [['pmo', 'R'], ['dir', 'A']], desc: 'Contractual penalty triggers activate automatically when the window is breached.' },
+    { id: 'c-canary', name: 'Canary routing validation', src: 'T-1h runbook gate', ok: false, own: [['ops', 'R'], ['dir', 'A']], desc: 'Canary routing validations and loopback interface traffic checks.' }
+  ];
+
+  var SCENARIOS = {
+    ponr_abort: {
+      name: 'T-3 PONR panic abort & contract re-up', tagline: 'Brinkmanship during the nightly cutover window', month: 12,
+      desc: 'The incumbent stalls final snapshot validation until T-3h. Facing an unverified backup, the director aborts cutover, steering committee confidence breaks, and the board signs a mandatory 3-year legacy maintenance renewal.',
+      strategy: 'Time-bleed the maintenance window to weaponize executive risk aversion.',
+      windfall: '$18.5M 3-year legacy O&M renewal + $2.4M incident analysis retainer',
+      vec: ['v2', 'v3', 'v4', 'r1', 'r4'],
+      tl: [[1, 'Kickoff & baseline scope', 95], [3, 'The 150-field demand', 88], [6, 'HTTP 200 cloaking infiltration', 74], [9, 'Silent ledger drift emerges', 60], [11, 'Rehearsal export takes 4.5h vs 90 min', 48], [12, 'T-3h PONR abort triggered', 18], [15, '3-year legacy renewal signed', 8], [24, 'Incumbent lock-in solidified', 2]]
+    },
+    infinite_dual_run: {
+      name: 'The infinite dual-run trap', tagline: 'Permanent parallel running through silent data drift', month: 8,
+      desc: 'Offline batch scripts on legacy nodes bypass the Kafka CDC bus and inject continuous sync anomalies. Reconciliation can never pass audit, so the telco runs both systems indefinitely.',
+      strategy: 'Make data parity mathematically impossible so cutover can never be certified.',
+      windfall: '$250k/mo legacy O&M + $180k/mo permanent dual-run support',
+      vec: ['v3', 'r3'],
+      tl: [[1, 'Parallel architecture approved', 96], [4, 'Streaming pipeline commissioned', 85], [8, 'Permanent discrepancy impasse', 35], [12, 'The reconciliation tax', 22], [16, '"Interim forever" compromise', 14], [24, 'Permanent dual-bill milestone', 5]]
+    },
+    bespoke_bloat: {
+      name: 'Bespoke model capitulation', tagline: 'Deforming standard ODA models into legacy duplicates', month: 4,
+      desc: 'The incumbent demands more than 150 custom field extensions. The ARB gives in under schedule pressure, and the ACL grows into a monolith only the incumbent can service.',
+      strategy: 'Contaminate the target ontology until the cloud stack inherits all legacy debt.',
+      windfall: '$4.2M custom adapter change requests + $350k/mo integration retainer',
+      vec: ['v1', 'v2', 'r2'],
+      tl: [[1, 'TM Forum ODA baseline mandate', 94], [4, 'ARB capitulates on 165 extensions', 42], [8, 'Translation layer hits 65k lines', 28], [12, 'Stress test fails at 15% of peak', 18], [18, 'Target inherits legacy debt', 8], [24, 'Architectural vassalage established', 3]]
+    }
+  };
+
+  var BASELINE = {};
+  CONTROLS.forEach(function (c) { BASELINE[c.id] = c.ok; });
+
+  // ---------- Indexes ----------
+  var byId = {};
+  FIN.forEach(function (n) { n.kind = 'fin'; byId[n.id] = n; });
+  VECTORS.forEach(function (n) { n.kind = 'vec'; byId[n.id] = n; });
+  CONTROLS.forEach(function (n) { n.kind = 'ctl'; byId[n.id] = n; });
+  OWNERS.forEach(function (n) { n.kind = 'own'; byId[n.id] = n; });
+
+  function ownersOf(c) { var s = []; c.own.forEach(function (o) { if (s.indexOf(o[0]) < 0) s.push(o[0]); }); return s; }
+  function vecsOfCtl(cid) { return VECTORS.filter(function (v) { return v.ctl.indexOf(cid) >= 0; }); }
+  function vecsOfFin(fid) { return VECTORS.filter(function (v) { return v.fin.indexOf(fid) >= 0; }); }
+  function ctlsOfOwner(oid) { return CONTROLS.filter(function (c) { return ownersOf(c).indexOf(oid) >= 0; }); }
+  function openCtls(v) { return v.ctl.filter(function (cid) { return !byId[cid].ok; }); }
+  function vecOpen(v) { return openCtls(v).length > 0; }
+
+  // ---------- State ----------
+  var state = { focus: { type: 'scn', id: 'ponr_abort' }, horizon: 12 };
+
+  // ---------- Metrics ----------
+  function finAtRisk(f) {
+    var vs = vecsOfFin(f.id);
+    if (!vs.length) return 0;
+    var open = vs.filter(vecOpen).length;
+    return f.monthly * open / vs.length;
+  }
+  function money(n) {
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 1e7 ? 1 : 2) + 'M';
+    if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'k';
+    return '$' + Math.round(n);
+  }
+
+  // ---------- Highlight sets ----------
+  function addVecChain(set, v) {
+    set[v.id] = 1;
+    v.fin.forEach(function (f) { set[f] = 1; });
+    v.ctl.forEach(function (cid) { set[cid] = 1; ownersOf(byId[cid]).forEach(function (o) { set[o] = 1; }); });
+  }
+  function focusSet() {
+    var f = state.focus, set = {};
+    if (!f || (f.type === 'scn' && f.id === 'all')) return null;
+    if (f.type === 'scn') { SCENARIOS[f.id].vec.forEach(function (id) { addVecChain(set, byId[id]); }); return set; }
+    var n = byId[f.id];
+    if (n.kind === 'vec') addVecChain(set, n);
+    else if (n.kind === 'ctl') { set[n.id] = 1; ownersOf(n).forEach(function (o) { set[o] = 1; }); vecsOfCtl(n.id).forEach(function (v) { set[v.id] = 1; v.fin.forEach(function (x) { set[x] = 1; }); }); }
+    else if (n.kind === 'own') { set[n.id] = 1; ctlsOfOwner(n.id).forEach(function (c) { set[c.id] = 1; vecsOfCtl(c.id).forEach(function (v) { set[v.id] = 1; v.fin.forEach(function (x) { set[x] = 1; }); }); }); }
+    else if (n.kind === 'fin') { set[n.id] = 1; vecsOfFin(n.id).forEach(function (v) { set[v.id] = 1; v.ctl.forEach(function (cid) { set[cid] = 1; ownersOf(byId[cid]).forEach(function (o) { set[o] = 1; }); }); }); }
+    return set;
+  }
+
+  // ---------- Render nodes ----------
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function renderNodes() {
+    $('col-fin').innerHTML = FIN.map(function (f) {
+      var r = finAtRisk(f), share = r / f.monthly;
+      return '<button class="node fin" data-id="' + f.id + '"><span class="eyebrow" style="font-size:10px">' + f.cat + '</span><span class="nt">' + esc(f.label) + '</span>' +
+        '<span class="nm"><span class="amt">' + money(f.monthly) + '/mo</span><span class="pill ' + (share > 0 ? 'open' : 'ok') + '">' + Math.round(share * 100) + '% open</span></span></button>';
+    }).join('');
+
+    var vh = '<div class="lanehead">Program phases</div>';
+    VECTORS.forEach(function (v, i) {
+      if (i === 5) vh += '<div class="lanehead" style="padding-top:10px">Cutover night · T-Minus</div>';
+      var o = openCtls(v).length;
+      var status = o ? '<span class="pill open">' + o + ' open</span>' : '<span class="pill ok">Guarded</span>';
+      var tag = v.ponr ? '<span class="pill crit">' + v.tag + ' PONR</span>' : '<span class="num">' + v.tag + ' · ' + esc(v.where) + '</span>';
+      vh += '<button class="node vec ' + (o ? '' : 'guarded') + '" data-id="' + v.id + '"><span class="nm">' + tag + '</span><span class="nt">' + esc(v.name) + '</span><span class="nm"><span>' + v.ctl.length + ' controls</span>' + status + '</span></button>';
+    });
+    $('col-vec').innerHTML = vh;
+
+    $('col-ctl').innerHTML = CONTROLS.map(function (c) {
+      return '<button class="node ctl ' + (c.ok ? '' : 'open') + '" data-id="' + c.id + '"><span class="nt">' + esc(c.name) + '</span><span class="nm"><span><i class="dot"></i>' + (c.ok ? 'Verified' : 'Open') + '</span><span class="num">' + esc(c.src.split(' ')[0]) + '</span></span></button>';
+    }).join('');
+
+    $('col-own').innerHTML = OWNERS.map(function (o) {
+      var cs = ctlsOfOwner(o.id), open = cs.filter(function (c) { return !c.ok; }).length;
+      var a = CONTROLS.filter(function (c) { return c.own.some(function (x) { return x[0] === o.id && x[1] === 'A'; }); }).length;
+      var r = CONTROLS.filter(function (c) { return c.own.some(function (x) { return x[0] === o.id && x[1] === 'R'; }); }).length;
+      var extra = o.id === 'legacy' ? '<span class="pill open" style="align-self:flex-start;margin-top:3px">Conflict of interest</span>' : '';
+      return '<button class="node own" data-id="' + o.id + '"><span class="nt">' + o.label + '</span><span class="nm"><span class="num">A ' + a + ' · R ' + r + '</span>' +
+        (open ? '<span class="pill open">' + open + ' open</span>' : '<span class="pill ok">Clear</span>') + '</span>' + extra + '</button>';
+    }).join('');
+  }
+
+  // ---------- Edges ----------
+  function center(el, mr, side) {
+    var r = el.getBoundingClientRect();
+    return { x: (side === 'r' ? r.right : r.left) - mr.left, y: r.top + r.height / 2 - mr.top };
+  }
+  function path(a, b) {
+    var dx = (b.x - a.x) * 0.5;
+    return 'M' + a.x + ',' + a.y + ' C' + (a.x + dx) + ',' + a.y + ' ' + (b.x - dx) + ',' + b.y + ' ' + b.x + ',' + b.y;
+  }
+  function drawEdges() {
+    var map = $('map'), mr = map.getBoundingClientRect(), svg = $('edges');
+    var node = function (id) { return map.querySelector('.node[data-id="' + id + '"]'); };
+    var set = focusSet(), out = [];
+    function edge(a, b, cls) {
+      var ea = node(a), eb = node(b);
+      if (!ea || !eb) return;
+      var hl = set && set[a] && set[b] ? ' hl' : '';
+      out.push('<path class="edge ' + cls + hl + '" d="' + path(center(ea, mr, 'r'), center(eb, mr, 'l')) + '"/>');
+    }
+    VECTORS.forEach(function (v) { v.fin.forEach(function (f) { edge(f, v.id, 'fv'); }); });
+    VECTORS.forEach(function (v) { v.ctl.forEach(function (c) { edge(v.id, c, 'vc ' + (byId[c].ok ? 'ok' : 'open')); }); });
+    CONTROLS.forEach(function (c) { ownersOf(c).forEach(function (o) { edge(c.id, o, 'co'); }); });
+    svg.setAttribute('viewBox', '0 0 ' + mr.width + ' ' + mr.height);
+    svg.innerHTML = out.join('');
+  }
+
+  function applyHighlight() {
+    var set = focusSet(), map = $('map');
+    map.classList.toggle('dimmed', !!set);
+    map.querySelectorAll('.node').forEach(function (el) {
+      var id = el.getAttribute('data-id');
+      el.classList.toggle('hl', !!(set && set[id]));
+      el.classList.toggle('sel', state.focus && state.focus.type === 'node' && state.focus.id === id);
+    });
+    document.querySelectorAll('.chip[data-scn]').forEach(function (c) {
+      var s = c.getAttribute('data-scn');
+      c.setAttribute('aria-pressed', String(state.focus.type === 'scn' && state.focus.id === s));
+    });
+  }
+
+  // ---------- KPIs ----------
+  function renderKpis() {
+    var h = state.horizon;
+    var total = FIN.reduce(function (a, f) { return a + f.monthly; }, 0) * h;
+    var risk = FIN.reduce(function (a, f) { return a + finAtRisk(f); }, 0) * h;
+    $('k-exp').textContent = money(risk);
+    $('k-exp-sub').textContent = 'of ' + money(total) + ' total delay cost over ' + h + ' months';
+    $('k-exp-bar').style.width = (100 * risk / total) + '%';
+    var ok = CONTROLS.filter(function (c) { return c.ok; }).length;
+    $('k-cov').textContent = ok + '/' + CONTROLS.length;
+    $('k-cov-sub').textContent = (CONTROLS.length - ok) + ' controls still open';
+    $('k-cov-bar').style.width = (100 * ok / CONTROLS.length) + '%';
+    var ov = VECTORS.filter(vecOpen);
+    $('k-vec').textContent = ov.length + '/' + VECTORS.length;
+    var crit = ov.filter(function (v) { return v.sev === 'critical'; }).length;
+    $('k-vec-sub').textContent = crit ? crit + ' critical play' + (crit > 1 ? 's' : '') + ' still live' : 'No critical play left open';
+    var top = FIN.map(function (f) { return { f: f, r: finAtRisk(f) }; }).sort(function (a, b) { return b.r - a.r; })[0];
+    $('k-top').textContent = top.r ? money(top.r) + '/mo' : '$0';
+    $('k-top-sub').textContent = top.r ? top.f.label : 'No cost line exposed';
+    $('horizon-v').textContent = h + ' mo';
+  }
+
+  // ---------- Briefing rail ----------
+  function nodeLink(id, text) { return '<button class="link" data-go="' + id + '">' + esc(text) + '</button>'; }
+  function togBtn(c) { return '<button class="tog ' + (c.ok ? 'ok' : 'open') + '" data-tog="' + c.id + '">' + (c.ok ? 'Verified' : 'Open') + '</button>'; }
+
+  function briefScenario(id) {
+    if (id === 'all') {
+      var ov = VECTORS.filter(vecOpen);
+      return '<div><div class="eyebrow">How to read this map</div><h2>Where the incumbent can still win</h2></div>' +
+        '<p class="lede">Read left to right. Each cost line on the left is inflated by one or more resistance plays. Each play is neutralized only when every control wired to it is verified. Each control has a named owner.</p>' +
+        '<div class="verdict ' + (ov.length ? 'open' : 'ok') + '"><b>' + (ov.length ? ov.length + ' plays still runnable' : 'Every play contained') + '</b>' +
+        (ov.length ? 'A single open control keeps the whole play alive. The incumbent only needs one.' : 'Hold this posture through cutover night.') + '</div>' +
+        '<div><h3>Open plays</h3><ul class="list">' + (ov.length ? ov.map(function (v) { return '<li>' + nodeLink(v.id, v.tag + ' · ' + v.name) + '<span class="pill open">' + openCtls(v).length + '</span></li>'; }).join('') : '<li>None</li>') + '</ul></div>' +
+        '<p class="note">Exposure model: each cost line is split evenly across the plays that drive it. The share tied to an open play counts as unguarded.</p>';
+    }
+    var s = SCENARIOS[id];
+    var gaps = [];
+    s.vec.forEach(function (vid) { openCtls(byId[vid]).forEach(function (c) { if (gaps.indexOf(c) < 0) gaps.push(c); }); });
+    var verdict = gaps.length
+      ? '<div class="verdict open"><b>Exposed: ' + gaps.length + ' open control' + (gaps.length > 1 ? 's' : '') + ' on this play</b>The incumbent can still run this scenario. Close the gaps below before month ' + s.month + '.</div>'
+      : '<div class="verdict ok"><b>Contained</b>Every control on this play is verified. The derailment path is shut.</div>';
+    return '<div><div class="eyebrow">Derailment scenario · hits month ' + s.month + '</div><h2>' + esc(s.name) + '</h2></div>' +
+      '<p class="lede">' + esc(s.desc) + '</p>' + verdict +
+      (gaps.length ? '<div><h3>Gaps to close</h3><ul class="list">' + gaps.map(function (cid) { var c = byId[cid]; return '<li>' + nodeLink(c.id, c.name) + togBtn(c) + '</li>'; }).join('') + '</ul></div>' : '') +
+      '<dl class="kv"><dt>Their strategy</dt><dd>' + esc(s.strategy) + '</dd><dt>Their windfall</dt><dd style="color:var(--money)">' + esc(s.windfall) + '</dd></dl>' +
+      '<div><h3>Plays in this scenario</h3><ul class="list">' + s.vec.map(function (vid) { var v = byId[vid]; var o = openCtls(v).length; return '<li>' + nodeLink(v.id, v.tag + ' · ' + v.name) + '<span class="pill ' + (o ? 'open' : 'ok') + '">' + (o ? o + ' open' : 'Guarded') + '</span></li>'; }).join('') + '</ul></div>' +
+      '<div><h3>If undefended: transformation viability</h3><div class="timeline">' + s.tl.map(function (t) {
+        return '<div class="tl' + (t[0] === s.month ? ' hit' : '') + '"><span class="m">M' + (t[0] < 10 ? '0' : '') + t[0] + '</span><span>' + esc(t[1]) + '</span><span class="v">' + t[2] + '%</span></div>';
+      }).join('') + '</div></div>';
+  }
+
+  function briefVector(v) {
+    var o = openCtls(v);
+    var fin = v.fin.map(function (fid) { var f = byId[fid]; return '<li>' + nodeLink(f.id, f.label) + '<span class="pill money">' + money(f.monthly) + '/mo</span></li>'; }).join('');
+    var head = '<div><div class="eyebrow">' + (v.lane === 'phase' ? 'Phase ' + v.tag.slice(1) + ' · ' : 'Cutover ' + v.tag + ' · ') + esc(v.where) + '</div><h2>' + esc(v.name) + '</h2></div>';
+    var body = '<p class="lede">' + esc(v.play) + '</p>' +
+      (o.length ? '<div class="verdict open"><b>Play is live</b>' + o.length + ' of ' + v.ctl.length + ' controls open. Severity: ' + v.sev + '.</div>' : '<div class="verdict ok"><b>Play neutralized</b>All ' + v.ctl.length + ' controls verified.</div>') +
+      '<div><h3>Controls</h3><ul class="list">' + v.ctl.map(function (cid) { var c = byId[cid]; return '<li>' + nodeLink(c.id, c.name) + togBtn(c) + '</li>'; }).join('') + '</ul></div>' +
+      '<dl class="kv">' + (v.goal ? '<dt>Their aim</dt><dd>' + esc(v.goal) + '</dd>' : '') + (v.kpi ? '<dt>Their KPI</dt><dd>' + esc(v.kpi) + '</dd>' : '') +
+      '<dt>Counter</dt><dd>' + esc(v.counter) + '</dd>' + (v.check ? '<dt>Pass criteria</dt><dd>' + esc(v.check) + '</dd>' : '') +
+      (v.role ? '<dt>On the bridge</dt><dd>' + esc(v.role) + '</dd>' : '') + (v.std ? '<dt>Standard</dt><dd>' + esc(v.std) + '</dd><dt>Open API</dt><dd class="num" style="font-size:12px">' + esc(v.api) + '</dd>' : '') + '</dl>' +
+      '<div><h3>Cost lines it inflates</h3><ul class="list">' + fin + '</ul></div>';
+    return head + body;
+  }
+
+  function briefControl(c) {
+    var vs = vecsOfCtl(c.id);
+    var roleName = function (id) { return byId[id].full; };
+    return '<div><div class="eyebrow">' + esc(c.src) + '</div><h2>' + esc(c.name) + '</h2></div>' +
+      '<p class="lede">' + esc(c.desc) + '</p>' +
+      '<div class="verdict ' + (c.ok ? 'ok' : 'open') + '"><b>' + (c.ok ? 'Verified' : 'Open gap') + '</b>' + (c.ok ? 'Evidence on file. Holds ' + vs.length + ' play' + (vs.length > 1 ? 's' : '') + ' in check.' : 'Leaves ' + vs.length + ' play' + (vs.length > 1 ? 's' : '') + ' runnable.') + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="bigbtn' + (c.ok ? ' ghost' : '') + '" data-tog="' + c.id + '">' + (c.ok ? 'Reopen control' : 'Mark verified') + '</button></div>' +
+      '<div><h3>Owners</h3><ul class="list">' + c.own.map(function (o) { return '<li>' + nodeLink(o[0], roleName(o[0])) + '<span class="pill ' + (o[1] === 'A' ? 'money' : 'ok') + '">' + (o[1] === 'A' ? 'Accountable' : 'Responsible') + '</span></li>'; }).join('') + '</ul></div>' +
+      (c.own.some(function (o) { return o[0] === 'legacy'; }) ? '<p class="note" style="color:var(--threat)">This control depends on the incumbent to execute. Back it with a contractual penalty or an automated fallback you own.</p>' : '') +
+      '<div><h3>Stops these plays</h3><ul class="list">' + vs.map(function (v) { var o = openCtls(v).length; return '<li>' + nodeLink(v.id, v.tag + ' · ' + v.name) + '<span class="pill ' + (o ? 'open' : 'ok') + '">' + (o ? 'Live' : 'Guarded') + '</span></li>'; }).join('') + '</ul></div>';
+  }
+
+  function briefOwner(o) {
+    var cs = ctlsOfOwner(o.id), open = cs.filter(function (c) { return !c.ok; });
+    var role = function (c) { return c.own.filter(function (x) { return x[0] === o.id; }).map(function (x) { return x[1]; }).join('/'); };
+    var coi = o.id === 'legacy' ? '<div class="verdict open"><b>Conflict of interest</b>' + cs.length + ' controls rely on the party whose revenue grows with delay. Every one needs a penalty clause or an owned fallback.</div>' :
+      '<div class="verdict ' + (open.length ? 'open' : 'ok') + '"><b>' + (open.length ? open.length + ' open on their desk' : 'Desk clear') + '</b>' + cs.length + ' controls carry this owner.</div>';
+    return '<div><div class="eyebrow">Owner</div><h2>' + esc(o.full) + '</h2></div><p class="lede">' + esc(o.desc) + '</p>' + coi +
+      '<div><h3>Controls</h3><ul class="list">' + cs.map(function (c) { return '<li><span>' + nodeLink(c.id, c.name) + ' <span class="num" style="color:var(--muted);font-size:11px">' + role(c) + '</span></span>' + togBtn(c) + '</li>'; }).join('') + '</ul></div>';
+  }
+
+  function briefFin(f) {
+    var vs = vecsOfFin(f.id), r = finAtRisk(f), h = state.horizon;
+    return '<div><div class="eyebrow">Exposure · ' + f.cat + '</div><h2>' + esc(f.label) + '</h2></div>' +
+      '<dl class="kv"><dt>Run-rate</dt><dd class="num">' + money(f.monthly) + '/mo</dd><dt>Unguarded</dt><dd class="num" style="color:var(--threat)">' + money(r) + '/mo · ' + money(r * h) + ' over ' + h + ' mo</dd></dl>' +
+      '<div><h3>Plays that inflate it</h3><ul class="list">' + vs.map(function (v) { var o = openCtls(v).length; return '<li>' + nodeLink(v.id, v.tag + ' · ' + v.name) + '<span class="pill ' + (o ? 'open' : 'ok') + '">' + (o ? 'Live' : 'Guarded') + '</span></li>'; }).join('') + '</ul></div>' +
+      '<dl class="kv"><dt>Commercial lever</dt><dd>' + esc(f.lever) + '</dd></dl>';
+  }
+
+  function renderBrief() {
+    var f = state.focus, html;
+    if (f.type === 'scn') html = briefScenario(f.id);
+    else {
+      var n = byId[f.id];
+      html = n.kind === 'vec' ? briefVector(n) : n.kind === 'ctl' ? briefControl(n) : n.kind === 'own' ? briefOwner(n) : briefFin(n);
+      html += '<button class="btn" data-scn="all" style="align-self:flex-start">Back to full map</button>';
+    }
+    $('brief').innerHTML = html;
+  }
+
+  // ---------- Update loop ----------
+  function renderAll() { renderNodes(); renderKpis(); renderBrief(); applyHighlight(); drawEdges(); }
+  function refocus() { renderBrief(); applyHighlight(); drawEdges(); }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-tog],[data-go],[data-scn],.node');
+    if (!t) return;
+    if (t.hasAttribute('data-tog')) { var c = byId[t.getAttribute('data-tog')]; c.ok = !c.ok; renderAll(); return; }
+    if (t.hasAttribute('data-scn')) { state.focus = { type: 'scn', id: t.getAttribute('data-scn') }; refocus(); return; }
+    var id = t.getAttribute('data-go') || t.getAttribute('data-id');
+    if (state.focus.type === 'node' && state.focus.id === id && t.classList.contains('node')) state.focus = { type: 'scn', id: 'all' };
+    else state.focus = { type: 'node', id: id };
+    refocus();
+  });
+  $('horizon').addEventListener('input', function (e) { state.horizon = +e.target.value; renderKpis(); renderBrief(); });
+  $('reset').addEventListener('click', function () { CONTROLS.forEach(function (c) { c.ok = BASELINE[c.id]; }); renderAll(); });
+  $('close-all').addEventListener('click', function () { CONTROLS.forEach(function (c) { c.ok = true; }); renderAll(); });
+
+  renderAll();
+  if (window.ResizeObserver) new ResizeObserver(function () { drawEdges(); }).observe($('map'));
+  else window.addEventListener('resize', drawEdges);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawEdges);
+})();
+</script>
